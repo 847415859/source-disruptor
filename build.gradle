@@ -52,6 +52,8 @@ repositories {
 }
 
 dependencies {
+    implementation 'org.projectlombok:lombok:1.18.20'
+    implementation 'ch.qos.logback:logback-classic:1.2.12'
     checkstyle 'com.puppycrawl.tools:checkstyle:8.2'
     testCompile 'junit:junit:4.12'
     perfCompile 'org.hdrhistogram:HdrHistogram:1.2.1'
@@ -62,16 +64,16 @@ idea.module {
     scopes.TEST.plus += [ configurations.perfCompile ]
 }
 
-sourceCompatibility = 1.7
-targetCompatibility = 1.7
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
 
 
 compileJava {
     // Suppress warnings about using Unsafe and sun.misc
-//    options.compilerArgs << '-XDignore.symbol.file'
+    options.compilerArgs << '-XDignore.symbol.file'
 //    options.fork = true
-//    options.debug = true
-//    options.forkOptions.executable = javaCompilerExecutable
+    options.debug = true
+    options.forkOptions.executable = 'javac'
 //    options.warnings = false
 }
 

@@ -17,6 +17,8 @@ package com.lmax.disruptor.util;
 
 /**
  * Cache line padded long variable to be used when false sharing maybe an issue.
+ * 缓存行的填充，避免出现伪共享问题
+ * 缓存行64位，正常一个long是8位
  */
 public final class PaddedLong extends MutableLong
 {
