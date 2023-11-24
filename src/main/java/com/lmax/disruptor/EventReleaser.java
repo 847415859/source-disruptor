@@ -15,7 +15,9 @@
  */
 package com.lmax.disruptor;
 
-public interface EventReleaser
-{
+/**
+ * 事件释放器，消费者调用即可不参与消费处理
+ */
+public interface EventReleaser {
     void release();
 }

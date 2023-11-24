@@ -17,15 +17,39 @@ package com.lmax.disruptor;
 
 
 /**
+ * 消费者使用的事件处理器序号屏障
  * {@link SequenceBarrier} handed out for gating {@link EventProcessor}s on a cursor sequence and optional dependent {@link EventProcessor}(s),
  * using the given WaitStrategy.
  */
-final class ProcessingSequenceBarrier implements SequenceBarrier
-{
+final class ProcessingSequenceBarrier implements SequenceBarrier {
+    /**
+     * 消费者等待策略
+     */
     private final WaitStrategy waitStrategy;
+    /**
+     * 依赖的Sequence。
+     * EventProcessor(事件处理器)的Sequence必须小于等于依赖的Sequence
+     * 来自于{@link com.lmax.disruptor.dsl.EventHandlerGroup#sequences}
+     *
+     * 对于直接和Sequencer相连的消费者，它依赖的Sequence就是Sequencer的Sequence。
+     * 对于跟在其它消费者屁股后面的消费者，它依赖的Sequence就是它跟随的所有消费者的Sequence。
+     *
+     * 类似 {@link AbstractSequencer#gatingSequences}
+     * dependentSequence
+     */
     private final Sequence dependentSequence;
+    /**
+     * 是否请求了关闭消费者
+     */
     private volatile boolean alerted = false;
+    /**
+     * 生产者的进度(cursor)
+     * 依赖该屏障的事件处理器的进度【必然要小于等于】生产者的进度
+     */
     private final Sequence cursorSequence;
+    /**
+     * 序号生成器(来自生产者)
+     */
     private final Sequencer sequencer;
 
     ProcessingSequenceBarrier(
@@ -91,8 +115,7 @@ final class ProcessingSequenceBarrier implements SequenceBarrier
     @Override
     public void checkAlert() throws AlertException
     {
-        if (alerted)
-        {
+        if (alerted) {
             throw AlertException.INSTANCE;
         }
     }

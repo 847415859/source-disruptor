@@ -33,29 +33,26 @@ public final class BlockingWaitStrategy implements WaitStrategy
 
     @Override
     public long waitFor(long sequence, Sequence cursorSequence, Sequence dependentSequence, SequenceBarrier barrier)
-        throws AlertException, InterruptedException
-    {
+        throws AlertException, InterruptedException {
         long availableSequence;
-        if (cursorSequence.get() < sequence)
-        {
+        // 生产者的生产偏移量 小于 我的消费偏移量
+        if (cursorSequence.get() < sequence) {
             lock.lock();
-            try
-            {
-                while (cursorSequence.get() < sequence)
-                {
+            try {
+                while (cursorSequence.get() < sequence) {
+                    // 检查当前的线程是否被停止，是则抛出异常 AlertException
                     barrier.checkAlert();
+                    // 阻塞等待
                     processorNotifyCondition.await();
                 }
-            }
-            finally
-            {
+            } finally {
                 lock.unlock();
             }
         }
-
-        while ((availableSequence = dependentSequence.get()) < sequence)
-        {
+        // 确保该序号已经被我前面的消费者消费(协调与其他消费者的关系)
+        while ((availableSequence = dependentSequence.get()) < sequence) {
             barrier.checkAlert();
+            // 自旋等待
             ThreadHints.onSpinWait();
         }
 
@@ -63,22 +60,18 @@ public final class BlockingWaitStrategy implements WaitStrategy
     }
 
     @Override
-    public void signalAllWhenBlocking()
-    {
+    public void signalAllWhenBlocking() {
         lock.lock();
-        try
-        {
+        try {
+            // 唤醒当前阻塞的线程
             processorNotifyCondition.signalAll();
-        }
-        finally
-        {
+        } finally {
             lock.unlock();
         }
     }
 
     @Override
-    public String toString()
-    {
+    public String toString() {
         return "BlockingWaitStrategy{" +
             "processorNotifyCondition=" + processorNotifyCondition +
             '}';

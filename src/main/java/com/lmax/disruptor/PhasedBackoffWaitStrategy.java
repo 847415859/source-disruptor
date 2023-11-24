@@ -18,6 +18,8 @@ package com.lmax.disruptor;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * 分阶段性的等待策略，在不同的等阶阶段采用不同的方式等待。
+ *
  * <p>Phased wait strategy for waiting {@link EventProcessor}s on a barrier.</p>
  *
  * <p>This strategy can be used when throughput and low-latency are not as important as CPU resource.
@@ -25,9 +27,13 @@ import java.util.concurrent.TimeUnit;
  */
 public final class PhasedBackoffWaitStrategy implements WaitStrategy
 {
+    // 自旋重试的次数
     private static final int SPIN_TRIES = 10000;
+    // 自旋超时时间
     private final long spinTimeoutNanos;
+    // yield 的超时时间
     private final long yieldTimeoutNanos;
+    // 保底策略
     private final WaitStrategy fallbackStrategy;
 
     public PhasedBackoffWaitStrategy(
@@ -109,22 +115,17 @@ public final class PhasedBackoffWaitStrategy implements WaitStrategy
             {
                 return availableSequence;
             }
-
-            if (0 == --counter)
-            {
-                if (0 == startTime)
-                {
+            // 先自旋
+            if (0 == --counter) {
+                if (0 == startTime) {
                     startTime = System.nanoTime();
-                }
-                else
-                {
+                } else {
                     long timeDelta = System.nanoTime() - startTime;
-                    if (timeDelta > yieldTimeoutNanos)
-                    {
+                    // yield 超时
+                    if (timeDelta > yieldTimeoutNanos) {
                         return fallbackStrategy.waitFor(sequence, cursor, dependentSequence, barrier);
-                    }
-                    else if (timeDelta > spinTimeoutNanos)
-                    {
+                    // 自旋超时
+                    } else if (timeDelta > spinTimeoutNanos) {
                         Thread.yield();
                     }
                 }

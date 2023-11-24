@@ -1,13 +1,27 @@
 package com.lmax.disruptor;
 
 /**
+ * 事件轮询器(没详细的研究，感觉它不是很重要)
+ *
  * Experimental poll-based interface for the Disruptor.
  */
 public class EventPoller<T>
 {
+    /**
+     * 数据提供者 RingBuffer
+     */
     private final DataProvider<T> dataProvider;
+    /**
+     * 序号生成器(来源于Sequencer)
+     */
     private final Sequencer sequencer;
+    /**
+     * 我的消费序号(进度)
+     */
     private final Sequence sequence;
+    /**
+     * 依赖的序号，我的sequence必须小于gatingSequence
+     */
     private final Sequence gatingSequence;
 
     public interface Handler<T>

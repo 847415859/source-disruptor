@@ -20,18 +20,36 @@ import com.lmax.disruptor.*;
 import java.util.*;
 
 /**
+ * 消费者信息仓库，将 EventHandler 与 EventProcessor关联起来。
+ * 传递给Disruptor的每一个EventHandler最终都会关联到一个EventProcessor。
+ * <P>
+ * 消费者之间的可见性保证：
+ * Sequence是单调递增的，当看见前驱消费者的进度增大时，所有前驱消费者对区间段内的数据的处理对当前消费者来说都是可见的。
+ * volatile的happens-before原则-----前驱消费者们的进度变大(写volatile)先于我看见它变大(读volatile)。
+ *
  * Provides a repository mechanism to associate {@link EventHandler}s with {@link EventProcessor}s
  *
  * @param <T> the type of the {@link EventHandler}
  */
 class ConsumerRepository<T> implements Iterable<ConsumerInfo>
 {
-    private final Map<EventHandler<?>, EventProcessorInfo<T>> eventProcessorInfoByEventHandler =
-        new IdentityHashMap<>();
-    private final Map<Sequence, ConsumerInfo> eventProcessorInfoBySequence =
-        new IdentityHashMap<>();
+    /**
+     * EventHandler到批量事件处理消费者信息的映射，用于信息查询
+     */
+    private final Map<EventHandler<?>, EventProcessorInfo<T>> eventProcessorInfoByEventHandler = new IdentityHashMap<>();
+    /**
+     * Sequence到消费者信息的映射
+     * 一个消费者可能有多个Sequence{@link WorkerPool}，但是一个Sequence只从属一个消费者。
+     */
+    private final Map<Sequence, ConsumerInfo> eventProcessorInfoBySequence = new IdentityHashMap<>();
+    /**
+     * 消费者信息列表
+     */
     private final Collection<ConsumerInfo> consumerInfos = new ArrayList<>();
 
+    /**
+     * 添加一个单事件处理器的消费者(单线程的消费者)
+     */
     public void add(
         final EventProcessor eventprocessor,
         final EventHandler<? super T> handler,
@@ -43,30 +61,35 @@ class ConsumerRepository<T> implements Iterable<ConsumerInfo>
         consumerInfos.add(consumerInfo);
     }
 
-    public void add(final EventProcessor processor)
-    {
+    /**
+     * 添加一个单事件处理器的消费者
+     */
+    public void add(final EventProcessor processor) {
         final EventProcessorInfo<T> consumerInfo = new EventProcessorInfo<>(processor, null, null);
         eventProcessorInfoBySequence.put(processor.getSequence(), consumerInfo);
         consumerInfos.add(consumerInfo);
     }
 
-    public void add(final WorkerPool<T> workerPool, final SequenceBarrier sequenceBarrier)
-    {
+    /**
+     * 添加一个多事件处理器的消费者(WorkerPool代表一个多线程的消费者)
+     */
+    public void add(final WorkerPool<T> workerPool, final SequenceBarrier sequenceBarrier) {
         final WorkerPoolInfo<T> workerPoolInfo = new WorkerPoolInfo<>(workerPool, sequenceBarrier);
         consumerInfos.add(workerPoolInfo);
-        for (Sequence sequence : workerPool.getWorkerSequences())
-        {
+        for (Sequence sequence : workerPool.getWorkerSequences()) {
             eventProcessorInfoBySequence.put(sequence, workerPoolInfo);
         }
     }
 
-    public Sequence[] getLastSequenceInChain(boolean includeStopped)
-    {
+    /**
+     * 获取消费链末端的消费者的Sequence
+     * @param includeStopped 是否包含已停止运行的消费者
+     */
+    public Sequence[] getLastSequenceInChain(boolean includeStopped) {
         List<Sequence> lastSequence = new ArrayList<>();
         for (ConsumerInfo consumerInfo : consumerInfos)
         {
-            if ((includeStopped || consumerInfo.isRunning()) && consumerInfo.isEndOfChain())
-            {
+            if ((includeStopped || consumerInfo.isRunning()) && consumerInfo.isEndOfChain()) {
                 final Sequence[] sequences = consumerInfo.getSequences();
                 Collections.addAll(lastSequence, sequences);
             }
@@ -75,8 +98,11 @@ class ConsumerRepository<T> implements Iterable<ConsumerInfo>
         return lastSequence.toArray(new Sequence[lastSequence.size()]);
     }
 
-    public EventProcessor getEventProcessorFor(final EventHandler<T> handler)
-    {
+    /**
+     * 获取EventHandler绑定的EventProcessor
+     * （每一个EventHandler都会被包装为一个EventProcessor，每一个EventProcessor有自己独立的Sequence）
+     */
+    public EventProcessor getEventProcessorFor(final EventHandler<T> handler) {
         final EventProcessorInfo<T> eventprocessorInfo = getEventProcessorInfo(handler);
         if (eventprocessorInfo == null)
         {
@@ -86,11 +112,17 @@ class ConsumerRepository<T> implements Iterable<ConsumerInfo>
         return eventprocessorInfo.getEventProcessor();
     }
 
-    public Sequence getSequenceFor(final EventHandler<T> handler)
-    {
+    /**
+     * 获取EventHandler绑定的Sequence
+     * （每一个EventHandler都会被包装为一个EventProcessor,每一个EventProcessor有自己独立的Sequence）
+     */
+    public Sequence getSequenceFor(final EventHandler<T> handler) {
         return getEventProcessorFor(handler).getSequence();
     }
 
+    /**
+     * 将这些Sequence标记为不在消费者链的末端了
+     */
     public void unMarkEventProcessorsAsEndOfChain(final Sequence... barrierEventProcessors)
     {
         for (Sequence barrierEventProcessor : barrierEventProcessors)
@@ -105,19 +137,30 @@ class ConsumerRepository<T> implements Iterable<ConsumerInfo>
         return consumerInfos.iterator();
     }
 
+    /**
+     * 获取EventHandler绑定的SequenceBarrier
+     * （每一个EventHandler都会被包装为一个EventProcessor,每一个EventProcessor从属于一个消费者，
+     *  一个消费者有且仅有一个SequenceBarrier)
+     */
     public SequenceBarrier getBarrierFor(final EventHandler<T> handler)
     {
         final ConsumerInfo consumerInfo = getEventProcessorInfo(handler);
         return consumerInfo != null ? consumerInfo.getBarrier() : null;
     }
 
-    private EventProcessorInfo<T> getEventProcessorInfo(final EventHandler<T> handler)
-    {
+    /**
+     * 如果EventHandler是独立工作的，那么可以获取它的EventProcessorInfo
+     * 独立工作的EventHandler会被包装为一个独立的消费者{@link BatchEventProcessor}，
+     * BatchEventProcessor消费者对应的消费者信息就是 {@link EventProcessorInfo}
+     */
+    private EventProcessorInfo<T> getEventProcessorInfo(final EventHandler<T> handler) {
         return eventProcessorInfoByEventHandler.get(handler);
     }
 
-    private ConsumerInfo getEventProcessorInfo(final Sequence barrierEventProcessor)
-    {
+    /**
+     * 获取Sequence对应的消费者信息，一个消费者可能有多个Sequence，但是一个Sequence一定只从属于一个消费者
+     */
+    private ConsumerInfo getEventProcessorInfo(final Sequence barrierEventProcessor) {
         return eventProcessorInfoBySequence.get(barrierEventProcessor);
     }
 }
