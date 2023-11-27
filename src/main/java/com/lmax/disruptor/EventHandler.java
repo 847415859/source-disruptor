@@ -36,8 +36,11 @@ public interface EventHandler<T>
      * the time between that message an the next one is inderminate.
      *
      * @param event      published to the {@link RingBuffer}
+     *                   事件
      * @param sequence   of the event being processed
+     *                   事件的进度
      * @param endOfBatch flag to indicate if this is the last event in a batch from the {@link RingBuffer}
+     *                   标记，以指示这是否是批处理中的最后一个事件
      * @throws Exception if the EventHandler would like the exception handled further up the chain.
      */
     void onEvent(T event, long sequence, boolean endOfBatch) throws Exception;

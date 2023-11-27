@@ -29,7 +29,7 @@ public class OrderEventProducer {
             e.printStackTrace();
         } finally {
             System.out.println("生产者发送数据value:"+value+",name:"+name);
-            //发布事件
+            //发布事件,标识当前进度的事件可用
             ringBuffer.publish(sequence);
         }
     }

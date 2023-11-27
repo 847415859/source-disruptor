@@ -2,29 +2,30 @@ package com.tk.disruptor;
 
 import com.lmax.disruptor.BlockingWaitStrategy;
 import com.lmax.disruptor.RingBuffer;
-import com.lmax.disruptor.YieldingWaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 
 import java.util.concurrent.Executors;
 
 /**
- * @Description:
- * @Date : 2023/05/13 17:00
+ * @Description: 多生产者测试
+ * @Date : 2023/11/27 9:43
  * @Auther : tiankun
  */
-public class DisruptorDemo {
+public class DisruptorMultiProducerTest {
+
     public static void main(String[] args) {
         //创建disruptor
         Disruptor<OrderEvent> disruptor = new Disruptor<>(
                 new OrderEventFactory(),
                 1024 * 1024,
                 Executors.defaultThreadFactory(),
-                ProducerType.SINGLE, //单生产者
+                ProducerType.MULTI, //单生产者
                 new BlockingWaitStrategy()  //等待策略
         );
         //设置消费者用于处理RingBuffer的事件
-        disruptor.handleEventsWithWorkerPool(new OrderEventHandler(),new OrderEventHandler());
+        disruptor.handleEventsWith(new OrderEventHandler())
+                        .then(new OrderEventHandler());
         disruptor.start();
 
         //创建ringbuffer容器
@@ -38,4 +39,5 @@ public class DisruptorDemo {
 
         disruptor.shutdown();
     }
+
 }

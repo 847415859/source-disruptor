@@ -190,7 +190,7 @@ public final class BatchEventProcessor<T>
         // -1是不需要消费的，第一个要消费的是0
         // sequence.get() 保存的是我当前消费到的进程，  +1是我想要消费的进程
 
-        // 1.获取事件的位置
+        // 获取我需要消费的事件的进程，比如刚启动默认为-1，那么我就需要请求进度为0的事件
         long nextSequence = sequence.get() + 1L;
 
         while (true) {
