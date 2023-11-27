@@ -678,8 +678,10 @@ public class Disruptor<T>
 
     /**
      * 更新网关序列(当消费者链后端添加新节点时)
-     * @param barrierSequences 新节点依赖的网关序列(屏障序列)，这些序列有了后继节点，就不再是网关序列了
-     * @param processorSequences 新增加的节点的序列，新增的在消费者链的末端，因此它们的序列就是新增的网关序列
+     *      我们在构建消费者消费关系时
+     *          A.then(B)
+     * @param barrierSequences 新节点依赖的网关序列(屏障序列)，这些序列有了后继节点，就不再是网关序列了        A#Sequence
+     * @param processorSequences 新增加的节点的序列，新增的在消费者链的末端，因此它们的序列就是新增的网关序列     B#sequence
      */
     private void updateGatingSequencesForNextInChain(final Sequence[] barrierSequences, final Sequence[] processorSequences)
     {
@@ -687,7 +689,9 @@ public class Disruptor<T>
             // 将新增加的消费者节点序列添加到网关序列中
             ringBuffer.addGatingSequences(processorSequences);
 
-            // 移除新节点的网关序列，这些序列有了后继节点，就不再是网关序列了
+            // 把当前消费者的依赖对象序号从 生产者的门禁集合里移除
+            // 为什么要这样做呢？
+            // 因为 消费者肯定慢于 依赖的消费者序号（屏障），所以构造的时候就把屏障序号从生产者门禁集合中移除，这样在求生产者门禁集合最小序号的时候就会更快
             for (final Sequence barrierSequence : barrierSequences) {
                 ringBuffer.removeGatingSequence(barrierSequence);
             }

@@ -194,10 +194,16 @@ public final class SingleProducerSequencer extends SingleProducerSequencerFields
         // 如果该序号大于最慢消费者的进度，那么表示追尾了，需要等待
         long wrapPoint = nextSequence - bufferSize;
 
-        // 上次缓存的最小网关序号(消费最慢的消费者的进度)
+        // 上次缓存的最小网关序号(消费最慢的消费者的进度)  因为是缓存，这里不是最新的
         long cachedGatingSequence = this.cachedValue;
+        // cachedValue就是缓存的消费者中最小序号值，为啥是cache呢？ 他仅仅是缓存，并不是当前最新的‘消费者中最小序号值’，
+        // cachedValue是上次程序进入到下面的if判定代码段时，被赋值的当时的‘消费者中最小序号值’
+        // 这样做的好处在于：在判定是否出现覆盖的时候，不用每次都调用 计算‘消费者中的最小序号值’，从而节约开销。
+        // 只要确保当生产者的 序号，大于了缓存的 cachedGatingSequence 一个bufferSize时，重新获取一下 getMinimumSequence()即可。
+
 
         // wrapPoint > cachedGatingSequence 表示生产者追上消费者产生环路(追尾)，即缓冲区已满，此时需要获取消费者们最新的进度，以确定是否队列满
+        //              此条件，避免当生产者一直在生产，但是消费者不再消费的情况下，出现‘覆盖’
         // cachedGatingSequence > nextValue 表示消费者的进度大于生产者进度，nextValue无效，建议忽略，
         // 正常情况下不会出现，调用claim(long)方法可能产生该情况，claim可能导致bug，只用在测试
         if (wrapPoint > cachedGatingSequence || cachedGatingSequence > nextValue)
